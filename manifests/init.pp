@@ -14,10 +14,13 @@
 #                 Use this on all the other servers (Default option)
 #
 # [*install_source*]
-#   Complete URL (http://....) of the splunk or splunkforwarder package
-#   to install. If not defined you must be able to install these
+#   Source parameter to pass to the splunk package resource.
+#   If not defined you must be able to install these
 #   packages via your default provider (apt, yum...) so you should
 #   have them in a custom repo
+#
+# [*install_provider*]
+#   Provider to use for the splunk package install, when install_source is set
 #
 # [*admin_password*]
 #   Splunk admin password both for the forwarder management and the splunk web
@@ -180,6 +183,7 @@
 class splunk (
   $install           = $splunk::params::install,
   $install_source    = $splunk::params::install_source,
+  $install_provider  = $splunk::params::install_provider,
   $admin_password    = $splunk::params::admin_password,
   $forward_server    = $splunk::params::forward_server,
   $monitor_path      = $splunk::params::monitor_path,
@@ -300,34 +304,17 @@ class splunk (
 
   # If install_source is defined installation is done retriving directly the defined source
   if $splunk::install_source != '' {
-
-    $install_command = $::operatingsystem ? {
-      /(?i:Debian|Ubuntu|Mint)/            => "wget \'${splunk::install_source}\' -O /tmp/splunk.deb ; dpkg -i /tmp/splunk.deb",
-      /(?i:RedHat|Centos|Scientific|Suse)/ => "rpm -U ${splunk::install_source}",
+    package { 'splunk':
+      ensure   => $splunk::manage_package,
+      name     => $splunk::package,
+      source   => $splunk::install_source,
+      provider => $splunk::install_provider,
     }
-
-    exec { 'splunk_manage_package':
-      command     => '/root/puppet_manage_package',
-      refreshonly => true,
-      before      => Package['splunk'],
-    }
-
-    file { 'splunk_manage_package':
-      ensure   => present,
-      path     => '/root/puppet_manage_package',
-      mode     => '0700',
-      owner    => 'root',
-      group    => 'root',
-      content  => template('splunk/manage_package.erb'),
-      before   => Package['splunk'] ,
-      notify   => Exec['splunk_manage_package'],
-    }
-
-  }
-
-  package { 'splunk':
-    ensure => $splunk::manage_package,
-    name   => $splunk::package,
+  } else {
+      package { 'splunk':
+        ensure => $splunk::manage_package,
+        name   => $splunk::package,
+      }
   }
 
   service { 'splunk':
